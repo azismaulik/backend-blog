@@ -2,19 +2,78 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
 
 const CategoryModel = require("./models/Category");
 const TagModel = require("./models/Tag");
+const UserModel = require("./models/User");
 
 const app = express();
 const connect = mongoose.connect(process.env.MONGODB_URL);
+const salt = bcrypt.genSaltSync(10);
+const secret = process.env.SECRET;
 
 app.use(cors());
+app.use(cookieParser());
 app.use(bodyParser.json());
 
 app.get("/", (req, res) => {
   res.send("hello world");
+});
+
+// register
+app.post("/api/v1/auth/register", async (req, res) => {
+  // login with checking username
+  const { username, password } = req.body;
+  try {
+    const userDoc = await UserModel.findOne({ username });
+    if (userDoc) {
+      return res.status(400).json({ error: "User already exists" });
+    }
+    const hash = bcrypt.hashSync(password, salt);
+    const user = new UserModel({ username, password: hash });
+    await user.save();
+    res.json(user);
+  } catch (e) {
+    res.status(400).json(e);
+  }
+});
+
+// login with set cookie to browser
+app.post("/api/v1/auth/login", async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const userDoc = await UserModel.findOne({ username });
+    if (!userDoc) {
+      return res.status(400).json({ error: "User not found" });
+    }
+    const passwordIsValid = bcrypt.compareSync(password, userDoc.password);
+    if (!passwordIsValid) {
+      return res.status(400).json({ error: "Invalid password" });
+    }
+    if (passwordIsValid) {
+      jwt.sign({ username, id: userDoc._id }, secret, {}, (err, token) => {
+        if (err) {
+          return res.status(500).json({ error: "Internal server error" });
+        }
+        res.cookie("token", token, { httpOnly: true }).status(200).json({
+          message: "Login successful",
+          token: token,
+        });
+      });
+    }
+  } catch (e) {
+    res.status(400).json({ error: "Bad request" });
+  }
+});
+
+// logout with delete cookie
+app.post("/api/v1/auth/logout", async (req, res) => {
+  res.clearCookie("token");
+  res.json({ message: "Logout successful" });
 });
 
 // post category
