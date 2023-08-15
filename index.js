@@ -5,20 +5,38 @@ const bodyParser = require("body-parser");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
+const cloudinary = require("cloudinary").v2;
+const fileupload = require("express-fileupload");
+
 require("dotenv").config();
 
 const CategoryModel = require("./models/Category");
 const TagModel = require("./models/Tag");
 const UserModel = require("./models/User");
+const PostModel = require("./models/Post");
 
 const app = express();
 const connect = mongoose.connect(process.env.MONGODB_URL);
 const salt = bcrypt.genSaltSync(10);
 const secret = process.env.SECRET;
 
-app.use(cors());
+// cors with origin localhost:3000
+const corsOptions = {
+  origin: "*",
+  credentials: true, //access-control-allow-credentials:true
+  optionSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(bodyParser.json());
+app.use(fileupload({ useTempFiles: true }));
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 app.get("/", (req, res) => {
   res.send("hello world");
@@ -221,6 +239,50 @@ app.delete("/api/v1/tag/:id", async (req, res) => {
       return res.status(404).json({ error: "tag not found" });
     }
     res.json(deletedTag);
+  } catch (e) {
+    res.status(400).json(e);
+  }
+});
+
+// POST endpoint to create a new post with cover to cloudinary
+app.post("/api/v1/posts", async (req, res) => {
+  try {
+    const { title, category, summary, content } = req.body;
+
+    if (!req.files || !req.files.image) {
+      return res.status(400).json({ message: "Image file missing" });
+    }
+
+    const file = req.files.image;
+
+    // Buat URL untuk Cloudinary
+    const result = await cloudinary.uploader.upload(file.tempFilePath, {
+      folder: "posts",
+    });
+
+    // Buat entri posting baru
+    const newPost = new PostModel({
+      title,
+      category,
+      summary,
+      content,
+      cover: result.secure_url,
+    });
+
+    await newPost.save();
+
+    return res.status(201).json(newPost); // Menggunakan status 201 untuk Created
+  } catch (e) {
+    console.error("An error occurred:", e);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// GET endpoint to retrieve all posts
+app.get("/api/v1/posts", async (req, res) => {
+  try {
+    const posts = await PostModel.find({});
+    res.json(posts);
   } catch (e) {
     res.status(400).json(e);
   }
