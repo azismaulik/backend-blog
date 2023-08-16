@@ -248,6 +248,7 @@ app.delete("/api/v1/tag/:id", async (req, res) => {
 app.post("/api/v1/posts", async (req, res) => {
   try {
     const { title, category, summary, content } = req.body;
+    const categories = JSON.parse(category);
 
     if (!req.files || !req.files.image) {
       return res.status(400).json({ message: "Image file missing" });
@@ -263,7 +264,7 @@ app.post("/api/v1/posts", async (req, res) => {
     // Buat entri posting baru
     const newPost = new PostModel({
       title,
-      category,
+      categories,
       summary,
       content,
       cover: result.secure_url,
@@ -283,6 +284,54 @@ app.get("/api/v1/posts", async (req, res) => {
   try {
     const posts = await PostModel.find({});
     res.json(posts);
+  } catch (e) {
+    res.status(400).json(e);
+  }
+});
+
+// GET endpoint to retrieve a post by ID
+app.get("/api/v1/posts/:id", async (req, res) => {
+  const postId = req.params.id;
+
+  try {
+    const postDoc = await PostModel.findById(postId);
+    if (!postDoc) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    res.json(postDoc);
+  } catch (e) {
+    res.status(400).json(e);
+  }
+});
+
+// update a post
+app.put("/api/v1/posts/:id", async (req, res) => {
+  const postId = req.params.id;
+  const updatedData = req.body;
+
+  try {
+    const updatedPost = await PostModel.findByIdAndUpdate(postId, updatedData, {
+      new: true,
+    });
+    if (!updatedPost) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    res.json(updatedPost);
+  } catch (e) {
+    res.status(400).json(e);
+  }
+});
+
+// delete a post
+app.delete("/api/v1/posts/:id", async (req, res) => {
+  const postId = req.params.id;
+
+  try {
+    const deletedPost = await PostModel.findByIdAndDelete(postId);
+    if (!deletedPost) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    res.json(deletedPost);
   } catch (e) {
     res.status(400).json(e);
   }

@@ -7,7 +7,7 @@ const PostSchema = new Schema(
     summary: String,
     content: String,
     cover: String,
-    categories: String,
+    categories: [String],
   },
   {
     timestamps: true,
