@@ -307,11 +307,28 @@ app.get("/api/v1/posts/:id", async (req, res) => {
 // update a post
 app.put("/api/v1/posts/:id", async (req, res) => {
   const postId = req.params.id;
-  const updatedData = req.body;
+  const { title, category, summary, content } = req.body;
+
+  const categories = JSON.parse(category);
+
+  if (!req.files || !req.files.image) {
+    return res.status(400).json({ message: "Image file missing" });
+  }
+
+  const file = req.files.image;
+
+  // Buat URL untuk Cloudinary
+  const result = await cloudinary.uploader.upload(file.tempFilePath, {
+    folder: "posts",
+  });
 
   try {
-    const updatedPost = await PostModel.findByIdAndUpdate(postId, updatedData, {
-      new: true,
+    const updatedPost = await PostModel.findByIdAndUpdate(postId, {
+      title,
+      categories,
+      summary,
+      content,
+      cover: result.secure_url,
     });
     if (!updatedPost) {
       return res.status(404).json({ error: "Post not found" });
