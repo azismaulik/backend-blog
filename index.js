@@ -289,12 +289,12 @@ app.get("/api/v1/posts", async (req, res) => {
   }
 });
 
-// GET endpoint to retrieve a post by ID
-app.get("/api/v1/posts/:id", async (req, res) => {
-  const postId = req.params.id;
+// GET endpoint to retrieve a post by title
+app.get("/api/v1/posts/:title", async (req, res) => {
+  const title = req.params.title;
 
   try {
-    const postDoc = await PostModel.findById(postId);
+    const postDoc = await PostModel.findOne({ title });
     if (!postDoc) {
       return res.status(404).json({ error: "Post not found" });
     }
@@ -304,35 +304,45 @@ app.get("/api/v1/posts/:id", async (req, res) => {
   }
 });
 
-// update a post
 app.put("/api/v1/posts/:id", async (req, res) => {
   const postId = req.params.id;
   const { title, category, summary, content } = req.body;
 
-  const categories = JSON.parse(category);
-
-  if (!req.files || !req.files.image) {
-    return res.status(400).json({ message: "Image file missing" });
-  }
-
-  const file = req.files.image;
-
-  // Buat URL untuk Cloudinary
-  const result = await cloudinary.uploader.upload(file.tempFilePath, {
-    folder: "posts",
-  });
-
   try {
-    const updatedPost = await PostModel.findByIdAndUpdate(postId, {
-      title,
-      categories,
-      summary,
-      content,
-      cover: result.secure_url,
+    let updateData = {};
+
+    if (title) {
+      updateData.title = title;
+    }
+
+    if (category) {
+      updateData.categories = JSON.parse(category);
+    }
+
+    if (summary) {
+      updateData.summary = summary;
+    }
+
+    if (content) {
+      updateData.content = content;
+    }
+
+    if (req.files && req.files.image) {
+      const file = req.files.image;
+      const result = await cloudinary.uploader.upload(file.tempFilePath, {
+        folder: "posts",
+      });
+      updateData.cover = result.secure_url;
+    }
+
+    const updatedPost = await PostModel.findByIdAndUpdate(postId, updateData, {
+      new: true,
     });
+
     if (!updatedPost) {
       return res.status(404).json({ error: "Post not found" });
     }
+
     res.json(updatedPost);
   } catch (e) {
     res.status(400).json(e);
