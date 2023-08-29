@@ -14,6 +14,7 @@ const CategoryModel = require("./models/Category");
 const TagModel = require("./models/Tag");
 const UserModel = require("./models/User");
 const PostModel = require("./models/Post");
+const ProjectModel = require("./models/Project");
 
 const app = express();
 const connect = mongoose.connect(process.env.MONGODB_URL);
@@ -359,6 +360,127 @@ app.delete("/api/v1/posts/:id", async (req, res) => {
       return res.status(404).json({ error: "Post not found" });
     }
     res.json(deletedPost);
+  } catch (e) {
+    res.status(400).json(e);
+  }
+});
+
+// add project with cloudinary
+app.post("/api/v1/projects", async (req, res) => {
+  try {
+    const { title, tags, description, link } = req.body;
+    const tagsArray = JSON.parse(tags);
+
+    if (!req.files || !req.files.image) {
+      return res.status(400).json({ message: "Image file missing" });
+    }
+
+    const file = req.files.image;
+
+    // Buat URL untuk Cloudinary
+    const result = await cloudinary.uploader.upload(file.tempFilePath, {
+      folder: "projects",
+    });
+
+    // Buat entri posting baru
+    const newProject = new ProjectModel({
+      title,
+      tags: tagsArray,
+      description,
+      link,
+      image: result.secure_url,
+    });
+
+    await newProject.save();
+
+    return res.status(201).json(newProject); // Menggunakan status 201 untuk Created
+  } catch (e) {
+    console.error("An error occurred:", e);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// get all projects
+app.get("/api/v1/projects", async (req, res) => {
+  try {
+    const projects = await ProjectModel.find({});
+    res.json(projects);
+  } catch (e) {
+    res.status(400).json(e);
+  }
+});
+
+// GET endpoint to retrieve a project by title
+app.get("/api/v1/projects/:title", async (req, res) => {
+  const title = req.params.title;
+
+  try {
+    const projectDoc = await ProjectModel.findOne({ title });
+    if (!projectDoc) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    res.json(projectDoc);
+  } catch (e) {
+    res.status(400).json(e);
+  }
+});
+
+// edit a project
+app.put("/api/v1/projects/:id", async (req, res) => {
+  const postId = req.params.id;
+  const { title, tags, description } = req.body;
+
+  try {
+    let updateData = {};
+
+    if (title) {
+      updateData.title = title;
+    }
+
+    if (tags) {
+      updateData.tags = JSON.parse(tags);
+    }
+
+    if (description) {
+      updateData.description = description;
+    }
+
+    if (req.files && req.files.image) {
+      const file = req.files.image;
+      const result = await cloudinary.uploader.upload(file.tempFilePath, {
+        folder: "projects",
+      });
+      updateData.image = result.secure_url;
+    }
+
+    const updatedProject = await ProjectModel.findByIdAndUpdate(
+      postId,
+      updateData,
+      {
+        new: true,
+      }
+    );
+
+    if (!updatedProject) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    res.json(updatedProject);
+  } catch (e) {
+    res.status(400).json(e);
+  }
+});
+
+// delete a project
+app.delete("/api/v1/projects/:id", async (req, res) => {
+  const projectId = req.params.id;
+
+  try {
+    const deletedProject = await ProjectModel.findByIdAndDelete(projectId);
+    if (!deletedProject) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    res.json(deletedProject);
   } catch (e) {
     res.status(400).json(e);
   }

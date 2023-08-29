@@ -7,7 +7,7 @@ const ProjectSchema = new Schema(
     description: String,
     image: String,
     link: String,
-    tag: { type: [String] },
+    tags: { type: [String] },
   },
   {
     timestamps: true,
